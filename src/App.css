@@ -1,0 +1,145 @@
+:root {
+  --bg-color: #f4f4f4;
+  --text-color: #333;
+  --container-bg: white;
+  --border-color: #ddd;
+  --btn-bg: #007bff;
+  --btn-hover: #0056b3;
+  --delete-btn-bg: #e74c3c;
+  --filter-btn-active: #007bff;
+  --filter-btn-color: white;
+}
+
+[data-theme='dark'] {
+  --bg-color: #1a1a1a;
+  --text-color: #f0f0f0;
+  --container-bg: #2c2c2c;
+  --border-color: #444;
+  --btn-bg: #0d6efd;
+  --btn-hover: #0b5ed7;
+  --delete-btn-bg: #dc3545;
+  --filter-btn-active: #0d6efd;
+  --filter-btn-color: white;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--bg-color);
+  margin: 0;
+  padding: 20px;
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.container {
+  max-width: 500px;
+  margin: auto;
+  background: var(--container-bg);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+}
+
+.theme-toggle {
+  padding: 5px 10px;
+  font-size: 14px;
+  background: var(--btn-bg);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+form {
+  display: flex;
+  gap: 10px;
+}
+
+input[type='text'] {
+  flex: 1;
+  padding: 10px;
+  font-size: 16px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+button {
+  padding: 10px 15px;
+  font-size: 16px;
+  background: var(--btn-bg);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+button:hover {
+  background: var(--btn-hover);
+}
+
+.delete-btn {
+  background: var(--delete-btn-bg);
+  margin-left: 5px;
+}
+
+.filters {
+  margin: 15px 0;
+}
+
+.filters button {
+  margin-right: 10px;
+  padding: 5px 10px;
+  background: #ccc;
+  color: black;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.filters button.active {
+  background: var(--filter-btn-active);
+  color: var(--filter-btn-color);
+}
+
+#task-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 20px;
+}
+
+#task-list li {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#task-list li.completed span {
+  text-decoration: line-through;
+  color: gray;
+}
+
+#task-list li input[type='text'] {
+  flex: 1;
+  margin-right: 10px;
+  padding: 5px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
