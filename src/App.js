@@ -1,5 +1,6 @@
 import './App.css'
 import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
   DndContext,
   closestCenter,
@@ -18,7 +19,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// ✅ ВЫНЕСЕННЫЕ ФУНКЦИИ — доступны везде
+// 🔐 Замените на ваш URL и анонимный ключ из проекта Supabase
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
+
+// ✅ ВЫНЕСЕННЫЕ ФУНКЦИИ
 const getPriorityLabel = (priority) => {
   switch (priority) {
     case 'urgent': return 'Срочно';
@@ -38,7 +45,7 @@ const getPriorityColor = (priority) => {
 };
 
 // Компонент задачи
-function TaskCard({ task, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdateDate, onUpdatePriority }) {
+function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdateDate, onUpdatePriority }) {
   const {
     attributes,
     listeners,
@@ -51,14 +58,13 @@ function TaskCard({ task, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdate
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const [editAssignee, setEditAssignee] = useState(task.assignee || '');
-  const [editDate, setEditDate] = useState(task.dueDate || '');
+  const [editDate, setEditDate] = useState(task.due_date || '');
   const [editPriority, setEditPriority] = useState(task.priority || 'idea');
 
-  const handleEdit = () => {
-    onEdit(task.id, editText, task.columnId);
-    onUpdateAssignee(task.id, editAssignee, task.columnId);
-    onUpdateDate(task.id, editDate, task.columnId);
-    onUpdatePriority(task.id, editPriority, task.columnId);
+  const canEdit = user.role === 'admin' || task.created_by === user.id;
+
+  const handleEdit = async () => {
+    await onEdit(task.id, editText, task.column_id, editPriority, editAssignee, editDate);
     setIsEditing(false);
   };
 
@@ -69,6 +75,9 @@ function TaskCard({ task, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdate
   };
 
   if (isEditing) {
+    if (!canEdit) {
+      return <div>У вас нет прав для редактирования этой задачи.</div>;
+    }
     return (
       <div
         ref={setNodeRef}
@@ -154,8 +163,9 @@ function TaskCard({ task, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdate
           <input
             type="checkbox"
             checked={task.completed}
-            onChange={() => onToggle(task.id, task.columnId)}
+            onChange={() => canEdit ? onToggle(task.id, task.column_id) : alert('Нет прав')}
             style={{ marginRight: '6px' }}
+            disabled={!canEdit}
           />
           Выполнено
         </label>
@@ -171,18 +181,24 @@ function TaskCard({ task, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdate
         </div>
       )}
 
-      {task.dueDate && (
+      {task.due_date && (
         <div style={{ marginBottom: '4px' }}>
-          <strong>📅</strong> {formatDate(task.dueDate)}
-          {new Date(task.dueDate) < new Date() && !task.completed && (
+          <strong>📅</strong> {formatDate(task.due_date)}
+          {new Date(task.due_date) < new Date() && !task.completed && (
             <span style={{ color: 'red', marginLeft: '4px' }}>(просрочено)</span>
           )}
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-        <button onClick={() => setIsEditing(true)}>Редактировать</button>
-        <button className="delete-btn" onClick={() => onDelete(task.id, task.columnId)}>
+        <button onClick={() => setIsEditing(true)} disabled={!canEdit}>
+          {canEdit ? 'Редактировать' : 'Нет прав'}
+        </button>
+        <button
+          className="delete-btn"
+          onClick={() => canEdit ? onDelete(task.id) : alert('Нет прав')}
+          disabled={!canEdit}
+        >
           Удалить
         </button>
       </div>
@@ -191,102 +207,147 @@ function TaskCard({ task, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdate
 }
 
 function App() {
-  const [columns, setColumns] = useState({
-    todo: [],
-    inProgress: [],
-    done: []
-  });
+  const [columns, setColumns] = useState({ todo: [], inProgress: [], done: [] });
   const [darkMode, setDarkMode] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
+  const [user, setUser] = useState(null); // { id, email, role: 'admin' | 'user' }
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailView, setEmailView] = useState(false); // true = показать email форму
 
   useEffect(() => {
-    const savedColumns = JSON.parse(localStorage.getItem('kanban-columns')) || {
-      todo: [],
-      inProgress: [],
-      done: []
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const email = session.user.email;
+        const role = email === 'admin@example.com' ? 'admin' : 'user';
+        setUser({ id: session.user.id, email, role });
+      }
+      setLoading(false);
     };
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    setColumns(savedColumns);
-    setDarkMode(savedDarkMode);
+    fetchUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        const email = session.user.email;
+        const role = email === 'admin@example.com' ? 'admin' : 'user';
+        setUser({ id: session.user.id, email, role });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('kanban-columns', JSON.stringify(columns));
-    localStorage.setItem('darkMode', darkMode);
-    if (darkMode) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.setAttribute('data-theme', 'light');
-    }
-  }, [columns, darkMode]);
+    if (!user) return;
+    const fetchTasks = async () => {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (error) console.error(error);
+      else {
+        const grouped = { todo: [], inProgress: [], done: [] };
+        data.forEach(task => {
+          grouped[task.column_id].push(task);
+        });
+        setColumns(grouped);
+      }
+    };
+    fetchTasks();
+  }, [user]);
 
-  const addTask = (columnId, text, priority = 'idea', assignee = '', dueDate = '') => {
-    const newTask = {
-      id: Date.now(),
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
+    if (error) console.error(error);
+  };
+
+  const signInWithEmail = async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) alert(error.message);
+  };
+
+  const signUpWithEmail = async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (error) alert(error.message);
+    else alert('Проверьте вашу почту для подтверждения регистрации.');
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const addTask = async (columnId, text, priority = 'idea', assignee = '', dueDate = '') => {
+    const { error } = await supabase.from('tasks').insert({
       text,
       completed: false,
       priority,
       assignee,
-      dueDate,
-      columnId
-    };
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: [...prev[columnId], newTask]
-    }));
+      due_date: dueDate,
+      column_id: columnId,
+      created_by: user.id,
+    });
+    if (!error) {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (!error) {
+        const grouped = { todo: [], inProgress: [], done: [] };
+        data.forEach(task => grouped[task.column_id].push(task));
+        setColumns(grouped);
+      }
+    }
   };
 
-  const toggleTask = (id, columnId) => {
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: prev[columnId].map(task =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    }));
+  const toggleTask = async (id, columnId) => {
+    const { error } = await supabase.from('tasks').update({ completed: !columns[columnId].find(t => t.id === id).completed }).eq('id', id);
+    if (!error) {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (!error) {
+        const grouped = { todo: [], inProgress: [], done: [] };
+        data.forEach(task => grouped[task.column_id].push(task));
+        setColumns(grouped);
+      }
+    }
   };
 
-  const deleteTask = (id, columnId) => {
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: prev[columnId].filter(task => task.id !== id)
-    }));
+  const deleteTask = async (id) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (!error) {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (!error) {
+        const grouped = { todo: [], inProgress: [], done: [] };
+        data.forEach(task => grouped[task.column_id].push(task));
+        setColumns(grouped);
+      }
+    }
   };
 
-  const editTask = (id, newText, columnId) => {
-    if (newText.trim() === '') return;
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: prev[columnId].map(task =>
-        task.id === id ? { ...task, text: newText.trim() } : task
-      )
-    }));
-  };
-
-  const updateAssignee = (id, newAssignee, columnId) => {
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: prev[columnId].map(task =>
-        task.id === id ? { ...task, assignee: newAssignee } : task
-      )
-    }));
-  };
-
-  const updateDate = (id, newDate, columnId) => {
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: prev[columnId].map(task =>
-        task.id === id ? { ...task, dueDate: newDate } : task
-      )
-    }));
-  };
-
-  const updatePriority = (id, newPriority, columnId) => {
-    setColumns(prev => ({
-      ...prev,
-      [columnId]: prev[columnId].map(task =>
-        task.id === id ? { ...task, priority: newPriority } : task
-      )
-    }));
+  const editTask = async (id, newText, columnId, priority, assignee, dueDate) => {
+    const { error } = await supabase.from('tasks').update({
+      text: newText,
+      priority,
+      assignee,
+      due_date: dueDate
+    }).eq('id', id);
+    if (!error) {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (!error) {
+        const grouped = { todo: [], inProgress: [], done: [] };
+        data.forEach(task => grouped[task.column_id].push(task));
+        setColumns(grouped);
+      }
+    }
   };
 
   const sensors = useSensors(
@@ -307,7 +368,7 @@ function App() {
     }
   };
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = async (event) => {
     const { active, over } = event;
     setActiveTask(null);
 
@@ -327,25 +388,22 @@ function App() {
 
     if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
 
-    if (activeColumnId === overColumnId) {
-      const tasks = columns[activeColumnId];
-      const oldIndex = tasks.findIndex(t => t.id === active.id);
-      const newIndex = tasks.findIndex(t => t.id === over.id);
-      if (oldIndex !== newIndex) {
-        setColumns(prev => ({
-          ...prev,
-          [activeColumnId]: arrayMove(tasks, oldIndex, newIndex)
-        }));
-      }
-    } else {
-      const activeTask = columns[activeColumnId].find(t => t.id === active.id);
-      if (!activeTask) return;
+    const activeTask = columns[activeColumnId].find(t => t.id === active.id);
+    if (!activeTask) return;
 
-      setColumns(prev => ({
-        ...prev,
-        [activeColumnId]: prev[activeColumnId].filter(t => t.id !== active.id),
-        [overColumnId]: [...prev[overColumnId], { ...activeTask, columnId: overColumnId }]
-      }));
+    if (user.role !== 'admin' && activeTask.created_by !== user.id) {
+      alert('Нет прав для перемещения чужой задачи');
+      return;
+    }
+
+    const { error } = await supabase.from('tasks').update({ column_id: overColumnId }).eq('id', active.id);
+    if (!error) {
+      const { data, error } = await supabase.from('tasks').select('*');
+      if (!error) {
+        const grouped = { todo: [], inProgress: [], done: [] };
+        data.forEach(task => grouped[task.column_id].push(task));
+        setColumns(grouped);
+      }
     }
   };
 
@@ -357,13 +415,60 @@ function App() {
   const totalTasks = stats.todo.total + stats.inProgress.total + stats.done.total;
   const totalCompleted = stats.todo.completed + stats.inProgress.completed + stats.done.completed;
 
+  if (loading) return <div>Загрузка...</div>;
+
+  if (!user) {
+    return (
+      <div className="container">
+        <h2>Войти в систему</h2>
+        <button onClick={loginWithGoogle}>Войти через Google</button>
+
+        <div style={{ marginTop: '20px' }}>
+          {!emailView ? (
+            <button onClick={() => setEmailView(true)}>Войти по email</button>
+          ) : (
+            <div>
+              <form onSubmit={signInWithEmail}>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={{ display: 'block', marginBottom: '10px', padding: '8px' }}
+                />
+                <input
+                  type="password"
+                  placeholder="Пароль"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={{ display: 'block', marginBottom: '10px', padding: '8px' }}
+                />
+                <button type="submit">Войти</button>
+              </form>
+              <p>Нет аккаунта? <button onClick={signUpWithEmail}>Зарегистрироваться</button></p>
+              <button onClick={() => setEmailView(false)}>Назад</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`container ${darkMode ? 'dark' : ''}`}>
       <div className="header">
         <h1>Моя Kanban-доска</h1>
-        <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)}>
-          {darkMode ? 'Светлая тема' : 'Тёмная тема'}
-        </button>
+        <div>
+          <span>Привет, {user.email} ({user.role})</span>
+          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)}>
+            {darkMode ? 'Светлая тема' : 'Тёмная тема'}
+          </button>
+          <button onClick={logout} style={{ marginLeft: '10px' }}>
+            Выйти
+          </button>
+        </div>
       </div>
 
       <div className="stats">
@@ -396,12 +501,13 @@ function App() {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      user={user}
                       onToggle={toggleTask}
                       onDelete={deleteTask}
                       onEdit={editTask}
-                      onUpdateAssignee={updateAssignee}
-                      onUpdateDate={updateDate}
-                      onUpdatePriority={updatePriority}
+                      onUpdateAssignee={() => {}}
+                      onUpdateDate={() => {}}
+                      onUpdatePriority={() => {}}
                     />
                   ))}
                 </div>
