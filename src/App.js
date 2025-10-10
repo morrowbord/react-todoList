@@ -20,10 +20,14 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // 🔐 Замените на ваш URL и анонимный ключ из проекта Supabase
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+//const supabase = createClient(
+//  process.env.REACT_APP_SUPABASE_URL,
+//  process.env.REACT_APP_SUPABASE_ANON_KEY
+//);
 
 // ✅ ВЫНЕСЕННЫЕ ФУНКЦИИ
 const getPriorityLabel = (priority) => {
@@ -290,6 +294,11 @@ function App() {
   };
 
   const addTask = async (columnId, text, priority = 'idea', assignee = '', dueDate = '') => {
+    if (!user || !user.id) {
+    alert('Пользователь не авторизован');
+    return;
+    }
+  
     const { error } = await supabase.from('tasks').insert({
       text,
       completed: false,
