@@ -1,4 +1,4 @@
-import './App.css'
+import './App.css';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -24,10 +24,6 @@ const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
-//const supabase = createClient(
-//  process.env.REACT_APP_SUPABASE_URL,
-//  process.env.REACT_APP_SUPABASE_ANON_KEY
-//);
 
 // ✅ ВЫНЕСЕННЫЕ ФУНКЦИИ
 const getPriorityLabel = (priority) => {
@@ -119,7 +115,7 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
         <input
           type="date"
           value={editDate}
-          onChange={(e) => setEditDate(e.target.value)}
+          onChange={(e) => setEditDate(e.target.value || null)}
           style={{ width: '100%', padding: '6px', marginBottom: '8px' }}
         />
         <button onClick={handleEdit} style={{ marginRight: '8px' }}>
@@ -293,22 +289,31 @@ function App() {
     await supabase.auth.signOut();
   };
 
-  const addTask = async (columnId, text, priority = 'idea', assignee = '', dueDate = '') => {
+  const addTask = async (columnId, text, priority = 'idea', assignee = '', dueDate = null) => {
     if (!user || !user.id) {
-    alert('Пользователь не авторизован');
-    return;
+      alert('Пользователь не авторизован');
+      return;
     }
-  
-    const { error } = await supabase.from('tasks').insert({
+
+    const taskData = {
       text,
       completed: false,
       priority,
       assignee,
-      due_date: dueDate,
       column_id: columnId,
       created_by: user.id,
-    });
-    if (!error) {
+    };
+
+    if (dueDate) {
+      taskData.due_date = dueDate;
+    }
+
+    const { error } = await supabase.from('tasks').insert(taskData);
+
+    if (error) {
+      console.error('Ошибка при добавлении задачи:', error);
+      alert('Ошибка: ' + error.message);
+    } else {
       const { data, error } = await supabase.from('tasks').select('*');
       if (!error) {
         const grouped = { todo: [], inProgress: [], done: [] };
@@ -343,12 +348,19 @@ function App() {
   };
 
   const editTask = async (id, newText, columnId, priority, assignee, dueDate) => {
-    const { error } = await supabase.from('tasks').update({
+    const taskData = {
       text: newText,
       priority,
       assignee,
-      due_date: dueDate
-    }).eq('id', id);
+    };
+
+    if (dueDate) {
+      taskData.due_date = dueDate;
+    } else {
+      taskData.due_date = null;
+    }
+
+    const { error } = await supabase.from('tasks').update(taskData).eq('id', id);
     if (!error) {
       const { data, error } = await supabase.from('tasks').select('*');
       if (!error) {
@@ -377,44 +389,61 @@ function App() {
     }
   };
 
-  const handleDragEnd = async (event) => {
-    const { active, over } = event;
-    setActiveTask(null);
+const handleDragEnd = async (event) => {
+  const { active, over } = event;
+  setActiveTask(null);
 
-    if (!over) return;
+  if (!over) return;
 
-    let activeColumnId = null;
-    for (const colId in columns) {
-      if (columns[colId].some(t => t.id === active.id)) {
-        activeColumnId = colId;
-        break;
-      }
+  let activeColumnId = null;
+  for (const colId in columns) {
+    if (columns[colId].some(t => t.id === active.id)) {
+      activeColumnId = colId;
+      break;
     }
+  }
 
-    if (!activeColumnId) return;
+  if (!activeColumnId) return;
 
-    const overColumnId = over.data?.current?.sortable?.containerId || over.id;
+  const overColumnId = over.data?.current?.sortable?.containerId || over.id;
 
-    if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
+  if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
 
-    const activeTask = columns[activeColumnId].find(t => t.id === active.id);
-    if (!activeTask) return;
+  const activeTask = columns[activeColumnId].find(t => t.id === active.id);
+  if (!activeTask) return;
 
-    if (user.role !== 'admin' && activeTask.created_by !== user.id) {
-      alert('Нет прав для перемещения чужой задачи');
-      return;
-    }
+  if (user.role !== 'admin' && activeTask.created_by !== user.id) {
+    alert('Нет прав для перемещения чужой задачи');
+    return;
+  }
 
+  // Если перетаскивание между колонками
+  if (activeColumnId !== overColumnId) {
     const { error } = await supabase.from('tasks').update({ column_id: overColumnId }).eq('id', active.id);
     if (!error) {
       const { data, error } = await supabase.from('tasks').select('*');
       if (!error) {
         const grouped = { todo: [], inProgress: [], done: [] };
         data.forEach(task => grouped[task.column_id].push(task));
+        // Добавляем задачу в начало целевой колонки
+        grouped[overColumnId] = [{ ...activeTask, column_id: overColumnId }, ...grouped[overColumnId].filter(t => t.id !== active.id)];
         setColumns(grouped);
       }
     }
-  };
+  } else {
+    // Перетаскивание внутри одной колонки
+    const tasks = columns[activeColumnId];
+    const oldIndex = tasks.findIndex(t => t.id === active.id);
+    const newIndex = tasks.findIndex(t => t.id === over.id);
+    if (oldIndex !== newIndex) {
+      const newTasks = arrayMove(tasks, oldIndex, newIndex);
+      setColumns(prev => ({
+        ...prev,
+        [activeColumnId]: newTasks
+      }));
+    }
+  }
+};
 
   const stats = {
     todo: { total: columns.todo.length, completed: columns.todo.filter(t => t.completed).length },
