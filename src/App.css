@@ -9,28 +9,38 @@
   --column-bg-todo: #e6e6fa;
   --column-bg-inprogress: #f5f5dc;
   --column-bg-done: #f0fff0;
+
+  /* Стили для задач */
+  --task-bg: white;
+  --task-border: #ddd;
+  --task-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 [data-theme="dark"] {
-  --bg-color: #1a1a1a;
-  --text-color: #f0f0f0;
-  --container-bg: #2c2c2c;
-  --border-color: #444;
-  --btn-bg: #0d6efd;
-  --btn-hover: #0b5ed7;
-  --delete-btn-bg: #dc3545;
-  --column-bg-todo: #3a3a5a;
-  --column-bg-inprogress: #4a4a3a;
-  --column-bg-done: #3a5a4a;
+  --bg-color: #121212;
+  --text-color: #e0e0e0;
+  --container-bg: #1e1e1e;
+  --border-color: #333;
+  --btn-bg: #4a90e2;
+  --btn-hover: #3a7bd5;
+  --delete-btn-bg: #d32f2f;
+  --column-bg-todo: #2c2c54;
+  --column-bg-inprogress: #2c3e2c;
+  --column-bg-done: #2c542c;
+
+  /* Стили для задач */
+  --task-bg: #2a2a2a;
+  --task-border: #444;
+  --task-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
 body {
-  font-family: Arial, sans-serif;
   background-color: var(--bg-color);
-  margin: 0;
-  padding: 20px;
   color: var(--text-color);
   transition: background-color 0.3s, color 0.3s;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
 }
 
 .container {
@@ -52,6 +62,7 @@ body {
 
 h1 {
   margin: 0;
+  color: var(--text-color);
 }
 
 .theme-toggle {
@@ -128,6 +139,7 @@ h1 {
 .column-header h3 {
   margin: 0;
   font-size: 18px;
+  color: var(--text-color);
 }
 
 .task-count {
@@ -152,6 +164,7 @@ h1 {
   min-height: 200px;
 }
 
+/* Стили для кнопок */
 button {
   padding: 8px 12px;
   font-size: 14px;
@@ -181,15 +194,84 @@ input[type="text"], input[type="date"] {
   color: var(--text-color);
 }
 
-@media (max-width: 768px) {
-  .kanban-board {
-    flex-direction: column;
-    gap: 10px;
-  }
-  .column {
-    min-width: auto;
-  }
-  .stats {
-    flex-direction: column;
-  }
+/* Стили для задач */
+.task-card {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--task-bg);
+  box-shadow: var(--task-shadow);
+  border-left: 4px solid #2ecc71;
+  transition: transform 0.2s;
+}
+
+.task-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.task-card.completed span {
+  text-decoration: line-through;
+  color: #999;
+}
+
+/* Статусы */
+.status-urgent {
+  color: #e74c3c;
+}
+
+.status-notImportant {
+  color: #95a5a6;
+}
+
+.status-idea {
+  color: #3498db;
+}
+
+/* Просроченная дата */
+.due-date-overdue {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+/* Иконки */
+.icon-handle {
+  cursor: grab;
+  font-weight: bold;
+  color: #666;
+}
+
+.icon-user {
+  color: #666;
+}
+
+.icon-calendar {
+  color: #666;
+}
+
+/* Кнопки редактирования и удаления */
+.edit-btn {
+  background: var(--btn-bg);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-btn {
+  background: var(--delete-btn-bg);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.edit-btn:hover {
+  background: var(--btn-hover);
+}
+
+.delete-btn:hover {
+  background: #c62828;
 }

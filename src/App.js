@@ -82,11 +82,15 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
       <div
         ref={setNodeRef}
         style={{
+          transform: CSS.Transform.toString(transform),
+          transition,
+          opacity: isDragging ? 0.5 : 1,
           padding: '12px',
           marginBottom: '8px',
           borderRadius: '6px',
-          background: 'white',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          background: 'var(--task-bg)',
+          boxShadow: 'var(--task-shadow)',
+          borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
         }}
       >
         <input
@@ -94,12 +98,28 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
           value={editText}
           onChange={(e) => setEditText(e.target.value)}
           autoFocus
-          style={{ width: '100%', padding: '6px', marginBottom: '8px' }}
+          style={{ 
+            width: '100%', 
+            padding: '6px', 
+            marginBottom: '8px',
+            background: 'var(--container-bg)',
+            color: 'var(--text-color)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px'
+          }}
         />
         <select
           value={editPriority}
           onChange={(e) => setEditPriority(e.target.value)}
-          style={{ width: '100%', padding: '6px', marginBottom: '8px' }}
+          style={{ 
+            width: '100%', 
+            padding: '6px', 
+            marginBottom: '8px',
+            background: 'var(--container-bg)',
+            color: 'var(--text-color)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px'
+          }}
         >
           <option value="urgent">Срочно</option>
           <option value="notImportant">Не важно</option>
@@ -110,13 +130,29 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
           value={editAssignee}
           onChange={(e) => setEditAssignee(e.target.value)}
           placeholder="Исполнитель"
-          style={{ width: '100%', padding: '6px', marginBottom: '8px' }}
+          style={{ 
+            width: '100%', 
+            padding: '6px', 
+            marginBottom: '8px',
+            background: 'var(--container-bg)',
+            color: 'var(--text-color)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px'
+          }}
         />
         <input
           type="date"
           value={editDate}
           onChange={(e) => setEditDate(e.target.value || null)}
-          style={{ width: '100%', padding: '6px', marginBottom: '8px' }}
+          style={{ 
+            width: '100%', 
+            padding: '6px', 
+            marginBottom: '8px',
+            background: 'var(--container-bg)',
+            color: 'var(--text-color)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px'
+          }}
         />
         <button onClick={handleEdit} style={{ marginRight: '8px' }}>
           Сохранить
@@ -136,8 +172,8 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
         padding: '12px',
         marginBottom: '8px',
         borderRadius: '6px',
-        background: 'white',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        background: 'var(--task-bg)',
+        boxShadow: 'var(--task-shadow)',
         borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
       }}
     >
@@ -153,7 +189,10 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
         {...listeners}
       >
         <span>≡</span>
-        <span style={{ textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? '#999' : 'inherit' }}>
+        <span style={{ 
+          textDecoration: task.completed ? 'line-through' : 'none', 
+          color: task.completed ? '#999' : 'var(--text-color)' 
+        }}>
           {task.text}
         </span>
       </div>
@@ -176,16 +215,16 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
       </div>
 
       {task.assignee && (
-        <div style={{ marginBottom: '4px' }}>
+        <div style={{ marginBottom: '4px', color: '#aaa' }}>
           <strong>👤</strong> {task.assignee}
         </div>
       )}
 
       {task.due_date && (
-        <div style={{ marginBottom: '4px' }}>
+        <div style={{ marginBottom: '4px', color: '#aaa' }}>
           <strong>📅</strong> {formatDate(task.due_date)}
           {new Date(task.due_date) < new Date() && !task.completed && (
-            <span style={{ color: 'red', marginLeft: '4px' }}>(просрочено)</span>
+            <span style={{ color: '#e74c3c', marginLeft: '4px', fontWeight: 'bold' }}>(просрочено)</span>
           )}
         </div>
       )}
@@ -216,6 +255,21 @@ function App() {
   const [password, setPassword] = useState('');
   const [emailView, setEmailView] = useState(false); // true = показать email форму
 
+  // 🔹 Загрузка данных при старте
+  useEffect(() => {
+    const savedColumns = JSON.parse(localStorage.getItem('kanban-columns')) || {
+      todo: [],
+      inProgress: [],
+      done: []
+    };
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    
+    setColumns(savedColumns);
+    setDarkMode(savedDarkMode);
+    setLoading(false);
+  }, []);
+
+  // 🔹 Загрузка пользователя и задач
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -224,7 +278,6 @@ function App() {
         const role = email === 'admin@example.com' ? 'admin' : 'user';
         setUser({ id: session.user.id, email, role });
       }
-      setLoading(false);
     };
     fetchUser();
 
@@ -243,6 +296,7 @@ function App() {
     };
   }, []);
 
+  // 🔹 Загрузка задач при изменении пользователя
   useEffect(() => {
     if (!user) return;
     const fetchTasks = async () => {
@@ -258,6 +312,19 @@ function App() {
     };
     fetchTasks();
   }, [user]);
+
+  // 🔹 Сохранение + применение темы и задач
+  useEffect(() => {
+    localStorage.setItem('kanban-columns', JSON.stringify(columns));
+    localStorage.setItem('darkMode', darkMode);
+    
+    // Применяем тему к <html>
+    if (darkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  }, [columns, darkMode]);
 
   const loginWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -389,61 +456,61 @@ function App() {
     }
   };
 
-const handleDragEnd = async (event) => {
-  const { active, over } = event;
-  setActiveTask(null);
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    setActiveTask(null);
 
-  if (!over) return;
+    if (!over) return;
 
-  let activeColumnId = null;
-  for (const colId in columns) {
-    if (columns[colId].some(t => t.id === active.id)) {
-      activeColumnId = colId;
-      break;
-    }
-  }
-
-  if (!activeColumnId) return;
-
-  const overColumnId = over.data?.current?.sortable?.containerId || over.id;
-
-  if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
-
-  const activeTask = columns[activeColumnId].find(t => t.id === active.id);
-  if (!activeTask) return;
-
-  if (user.role !== 'admin' && activeTask.created_by !== user.id) {
-    alert('Нет прав для перемещения чужой задачи');
-    return;
-  }
-
-  // Если перетаскивание между колонками
-  if (activeColumnId !== overColumnId) {
-    const { error } = await supabase.from('tasks').update({ column_id: overColumnId }).eq('id', active.id);
-    if (!error) {
-      const { data, error } = await supabase.from('tasks').select('*');
-      if (!error) {
-        const grouped = { todo: [], inProgress: [], done: [] };
-        data.forEach(task => grouped[task.column_id].push(task));
-        // Добавляем задачу в начало целевой колонки
-        grouped[overColumnId] = [{ ...activeTask, column_id: overColumnId }, ...grouped[overColumnId].filter(t => t.id !== active.id)];
-        setColumns(grouped);
+    let activeColumnId = null;
+    for (const colId in columns) {
+      if (columns[colId].some(t => t.id === active.id)) {
+        activeColumnId = colId;
+        break;
       }
     }
-  } else {
-    // Перетаскивание внутри одной колонки
-    const tasks = columns[activeColumnId];
-    const oldIndex = tasks.findIndex(t => t.id === active.id);
-    const newIndex = tasks.findIndex(t => t.id === over.id);
-    if (oldIndex !== newIndex) {
-      const newTasks = arrayMove(tasks, oldIndex, newIndex);
-      setColumns(prev => ({
-        ...prev,
-        [activeColumnId]: newTasks
-      }));
+
+    if (!activeColumnId) return;
+
+    const overColumnId = over.data?.current?.sortable?.containerId || over.id;
+
+    if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
+
+    const activeTask = columns[activeColumnId].find(t => t.id === active.id);
+    if (!activeTask) return;
+
+    if (user.role !== 'admin' && activeTask.created_by !== user.id) {
+      alert('Нет прав для перемещения чужой задачи');
+      return;
     }
-  }
-};
+
+    // Если перетаскивание между колонками
+    if (activeColumnId !== overColumnId) {
+      const { error } = await supabase.from('tasks').update({ column_id: overColumnId }).eq('id', active.id);
+      if (!error) {
+        const { data, error } = await supabase.from('tasks').select('*');
+        if (!error) {
+          const grouped = { todo: [], inProgress: [], done: [] };
+          data.forEach(task => grouped[task.column_id].push(task));
+          // Добавляем задачу в начало целевой колонки
+          grouped[overColumnId] = [{ ...activeTask, column_id: overColumnId }, ...grouped[overColumnId].filter(t => t.id !== active.id)];
+          setColumns(grouped);
+        }
+      }
+    } else {
+      // Перетаскивание внутри одной колонки
+      const tasks = columns[activeColumnId];
+      const oldIndex = tasks.findIndex(t => t.id === active.id);
+      const newIndex = tasks.findIndex(t => t.id === over.id);
+      if (oldIndex !== newIndex) {
+        const newTasks = arrayMove(tasks, oldIndex, newIndex);
+        setColumns(prev => ({
+          ...prev,
+          [activeColumnId]: newTasks
+        }));
+      }
+    }
+  };
 
   const stats = {
     todo: { total: columns.todo.length, completed: columns.todo.filter(t => t.completed).length },
@@ -558,9 +625,9 @@ const handleDragEnd = async (event) => {
           {activeTask ? (
             <div style={{
               padding: '12px',
-              background: 'white',
+              background: 'var(--task-bg)',
               borderRadius: '6px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              boxShadow: 'var(--task-shadow)',
               borderLeft: `4px solid ${getPriorityColor(activeTask.priority)}`,
             }}>
               {activeTask.text}
