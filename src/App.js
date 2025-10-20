@@ -45,7 +45,7 @@ const getPriorityColor = (priority) => {
 };
 
 // Компонент задачи
-function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, onUpdateDate, onUpdatePriority }) {
+function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateAssignee, onUpdateDate, onUpdatePriority }) {
   const {
     attributes,
     listeners,
@@ -234,11 +234,11 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
           {canEdit ? 'Редактировать' : 'Нет прав'}
         </button>
         <button
-          className="delete-btn"
-          onClick={() => canEdit ? onDelete(task.id) : alert('Нет прав')}
-          disabled={!canEdit}
+          className="archive-btn"
+          onClick={() => onArchive(task.id)}
+          style={{ backgroundColor: '#f39c12', color: 'white' }}
         >
-          Удалить
+          Архивировать
         </button>
       </div>
     </div>
@@ -247,6 +247,7 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onUpdateAssignee, on
 
 function App() {
   const [columns, setColumns] = useState({ todo: [], inProgress: [], done: [] });
+  const [archivedTasks, setArchivedTasks] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [user, setUser] = useState(null); // { id, email, role: 'admin' | 'user' }
@@ -254,6 +255,7 @@ function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailView, setEmailView] = useState(false); // true = показать email форму
+  const [view, setView] = useState('kanban'); // 'kanban' или 'archive'
 
   // 🔹 Загрузка данных при старте
   useEffect(() => {
@@ -303,11 +305,19 @@ function App() {
       const { data, error } = await supabase.from('tasks').select('*');
       if (error) console.error(error);
       else {
-        const grouped = { todo: [], inProgress: [], done: [] };
+        const activeTasks = { todo: [], inProgress: [], done: [] };
+        const archivedTasksList = [];
+        
         data.forEach(task => {
-          grouped[task.column_id].push(task);
+          if (task.column_id === 'archived') {
+            archivedTasksList.push(task);
+          } else {
+            activeTasks[task.column_id].push(task);
+          }
         });
-        setColumns(grouped);
+        
+        setColumns(activeTasks);
+        setArchivedTasks(archivedTasksList);
       }
     };
     fetchTasks();
@@ -354,6 +364,8 @@ function App() {
 
   const logout = async () => {
     await supabase.auth.signOut();
+    // Clear user state and potentially redirect
+    setUser(null);
   };
 
   const addTask = async (columnId, text, priority = 'idea', assignee = '', dueDate = null) => {
@@ -383,9 +395,19 @@ function App() {
     } else {
       const { data, error } = await supabase.from('tasks').select('*');
       if (!error) {
-        const grouped = { todo: [], inProgress: [], done: [] };
-        data.forEach(task => grouped[task.column_id].push(task));
-        setColumns(grouped);
+        const activeTasks = { todo: [], inProgress: [], done: [] };
+        const archivedTasksList = [];
+        
+        data.forEach(task => {
+          if (task.column_id === 'archived') {
+            archivedTasksList.push(task);
+          } else {
+            activeTasks[task.column_id].push(task);
+          }
+        });
+        
+        setColumns(activeTasks);
+        setArchivedTasks(archivedTasksList);
       }
     }
   };
@@ -395,21 +417,83 @@ function App() {
     if (!error) {
       const { data, error } = await supabase.from('tasks').select('*');
       if (!error) {
-        const grouped = { todo: [], inProgress: [], done: [] };
-        data.forEach(task => grouped[task.column_id].push(task));
-        setColumns(grouped);
+        const activeTasks = { todo: [], inProgress: [], done: [] };
+        const archivedTasksList = [];
+        
+        data.forEach(task => {
+          if (task.column_id === 'archived') {
+            archivedTasksList.push(task);
+          } else {
+            activeTasks[task.column_id].push(task);
+          }
+        });
+        
+        setColumns(activeTasks);
+        setArchivedTasks(archivedTasksList);
       }
     }
   };
 
+  const archiveTask = async (id) => {
+    // Update task to have a special archived column_id
+    const { error } = await supabase.from('tasks').update({ column_id: 'archived' }).eq('id', id);
+    if (error) {
+      console.error('Error archiving task:', error);
+      alert('Ошибка при архивации задачи: ' + error.message);
+      return;
+    }
+    
+    const { data, error: selectError } = await supabase.from('tasks').select('*');
+    if (!selectError) {
+      const activeTasks = { todo: [], inProgress: [], done: [] };
+      const archivedTasksList = [];
+      
+      data.forEach(task => {
+        if (task.column_id === 'archived') {
+          archivedTasksList.push(task);
+        } else {
+          activeTasks[task.column_id].push(task);
+        }
+      });
+      
+      setColumns(activeTasks);
+      setArchivedTasks(archivedTasksList);
+    } else {
+      console.error('Error fetching tasks after archiving:', selectError);
+    }
+  };
+
   const deleteTask = async (id) => {
+    // First check if the task is archived before deleting
+    const { data: taskData, error: fetchError } = await supabase.from('tasks').select('column_id').eq('id', id).single();
+    
+    if (fetchError) {
+      console.error('Error fetching task:', fetchError);
+      return;
+    }
+    
+    if (taskData.column_id !== 'archived') {
+      alert('Нельзя удалить задачу, которая не находится в архиве. Сначала архивируйте задачу.');
+      return;
+    }
+    
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (!error) {
-      const { data, error } = await supabase.from('tasks').select('*');
-      if (!error) {
-        const grouped = { todo: [], inProgress: [], done: [] };
-        data.forEach(task => grouped[task.column_id].push(task));
-        setColumns(grouped);
+      const { data, error: selectError } = await supabase.from('tasks').select('*');
+      if (!selectError) {
+        const activeTasks = { todo: [], inProgress: [], done: [] };
+        const archivedTasksList = [];
+        
+        data.forEach(task => {
+          if (task.column_id === 'archived') {
+            archivedTasksList.push(task);
+          } else {
+            activeTasks[task.column_id].push(task);
+          }
+        });
+        
+        setColumns(activeTasks);
+        setArchivedTasks(archivedTasksList);
       }
     }
   };
@@ -431,9 +515,19 @@ function App() {
     if (!error) {
       const { data, error } = await supabase.from('tasks').select('*');
       if (!error) {
-        const grouped = { todo: [], inProgress: [], done: [] };
-        data.forEach(task => grouped[task.column_id].push(task));
-        setColumns(grouped);
+        const activeTasks = { todo: [], inProgress: [], done: [] };
+        const archivedTasksList = [];
+        
+        data.forEach(task => {
+          if (task.column_id === 'archived') {
+            archivedTasksList.push(task);
+          } else {
+            activeTasks[task.column_id].push(task);
+          }
+        });
+        
+        setColumns(activeTasks);
+        setArchivedTasks(archivedTasksList);
       }
     }
   };
@@ -490,11 +584,21 @@ function App() {
       if (!error) {
         const { data, error } = await supabase.from('tasks').select('*');
         if (!error) {
-          const grouped = { todo: [], inProgress: [], done: [] };
-          data.forEach(task => grouped[task.column_id].push(task));
+          const activeTasks = { todo: [], inProgress: [], done: [] };
+          const archivedTasksList = [];
+          
+          data.forEach(task => {
+            if (task.column_id === 'archived') {
+              archivedTasksList.push(task);
+            } else {
+              activeTasks[task.column_id].push(task);
+            }
+          });
+          
           // Добавляем задачу в начало целевой колонки
-          grouped[overColumnId] = [{ ...activeTask, column_id: overColumnId }, ...grouped[overColumnId].filter(t => t.id !== active.id)];
-          setColumns(grouped);
+          activeTasks[overColumnId] = [{ ...activeTask, column_id: overColumnId }, ...activeTasks[overColumnId].filter(t => t.id !== active.id)];
+          setColumns(activeTasks);
+          setArchivedTasks(archivedTasksList);
         }
       }
     } else {
@@ -517,7 +621,7 @@ function App() {
     inProgress: { total: columns.inProgress.length, completed: columns.inProgress.filter(t => t.completed).length },
     done: { total: columns.done.length, completed: columns.done.filter(t => t.completed).length }
   };
-  const totalTasks = stats.todo.total + stats.inProgress.total + stats.done.total;
+  const totalTasks = stats.todo.total + stats.inProgress.total + stats.done.total + archivedTasks.length;
   const totalCompleted = stats.todo.completed + stats.inProgress.completed + stats.done.completed;
 
   if (loading) return <div>Загрузка...</div>;
@@ -567,6 +671,20 @@ function App() {
         <h1>Моя Kanban-доска</h1>
         <div>
           <span>Привет, {user.email} ({user.role})</span>
+          <button 
+            className={`view-toggle ${view === 'kanban' ? 'active' : ''}`} 
+            onClick={() => setView('kanban')}
+            style={{ marginLeft: '10px' }}
+          >
+            Доска
+          </button>
+          <button 
+            className={`view-toggle ${view === 'archive' ? 'active' : ''}`} 
+            onClick={() => setView('archive')}
+            style={{ marginLeft: '5px' }}
+          >
+            Архив ({archivedTasks.length})
+          </button>
           <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)}>
             {darkMode ? 'Светлая тема' : 'Тёмная тема'}
           </button>
@@ -576,65 +694,170 @@ function App() {
         </div>
       </div>
 
-      <div className="stats">
-        <div className="stat-card"><h4>Всего задач</h4><p>{totalTasks}</p></div>
-        <div className="stat-card"><h4>Выполнено</h4><p>{totalCompleted}</p></div>
-        <div className="stat-card"><h4>Осталось</h4><p>{totalTasks - totalCompleted}</p></div>
-      </div>
+      {view === 'kanban' && (
+        <>
+          <div className="stats">
+            <div className="stat-card"><h4>Всего задач</h4><p>{totalTasks}</p></div>
+            <div className="stat-card"><h4>Выполнено</h4><p>{totalCompleted}</p></div>
+            <div className="stat-card"><h4>Осталось</h4><p>{totalTasks - totalCompleted}</p></div>
+          </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="kanban-board">
-          {Object.entries(columns).map(([columnId, tasks]) => (
-            <div key={columnId} className={`column ${columnId}`}>
-              <div className="column-header">
-                <h3>
-                  {columnId === 'todo' ? 'Задачи' : columnId === 'inProgress' ? 'В работе' : 'Готово'}
-                  <span className="task-count"> ({tasks.length})</span>
-                </h3>
-                <button onClick={() => addTask(columnId, 'Новая задача')}>
-                  + Добавить
-                </button>
-              </div>
-              <SortableContext id={columnId} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                <div className="task-list">
-                  {tasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      user={user}
-                      onToggle={toggleTask}
-                      onDelete={deleteTask}
-                      onEdit={editTask}
-                      onUpdateAssignee={() => {}}
-                      onUpdateDate={() => {}}
-                      onUpdatePriority={() => {}}
-                    />
-                  ))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="kanban-board">
+              {Object.entries(columns).map(([columnId, tasks]) => (
+                <div key={columnId} className={`column ${columnId}`}>
+                  <div className="column-header">
+                    <h3>
+                      {columnId === 'todo' ? 'Задачи' : columnId === 'inProgress' ? 'В работе' : 'Готово'}
+                      <span className="task-count"> ({tasks.length})</span>
+                    </h3>
+                    <button onClick={() => addTask(columnId, 'Новая задача')}>
+                      + Добавить
+                    </button>
+                  </div>
+                  <SortableContext id={columnId} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                    <div className="task-list">
+                      {tasks.map(task => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          user={user}
+                          onToggle={toggleTask}
+                          onDelete={deleteTask}
+                          onEdit={editTask}
+                          onArchive={archiveTask}
+                          onUpdateAssignee={() => {}}
+                          onUpdateDate={() => {}}
+                          onUpdatePriority={() => {}}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
                 </div>
-              </SortableContext>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <DragOverlay>
-          {activeTask ? (
-            <div style={{
-              padding: '12px',
-              background: 'var(--task-bg)',
-              borderRadius: '6px',
-              boxShadow: 'var(--task-shadow)',
-              borderLeft: `4px solid ${getPriorityColor(activeTask.priority)}`,
-            }}>
-              {activeTask.text}
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+            <DragOverlay>
+              {activeTask ? (
+                <div style={{
+                  padding: '12px',
+                  background: 'var(--task-bg)',
+                  borderRadius: '6px',
+                  boxShadow: 'var(--task-shadow)',
+                  borderLeft: `4px solid ${getPriorityColor(activeTask.priority)}`,
+                }}>
+                  {activeTask.text}
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </>
+      )}
+
+      {view === 'archive' && (
+        <div className="archive-view">
+          <h2>Архив задач</h2>
+          <div className="archived-tasks-list">
+            {archivedTasks.length === 0 ? (
+              <p>Нет архивированных задач</p>
+            ) : (
+              archivedTasks.map(task => (
+                <div key={task.id} className="archived-task-card" style={{
+                  padding: '12px',
+                  marginBottom: '8px',
+                  borderRadius: '6px',
+                  background: 'var(--task-bg)',
+                  boxShadow: 'var(--task-shadow)',
+                  borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
+                }}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>{task.text}</strong>
+                    {task.completed && <span style={{ marginLeft: '8px', color: '#27ae60' }}>✓ Выполнено</span>}
+                  </div>
+                  
+                  <div style={{ marginBottom: '4px' }}>
+                    <strong>Статус:</strong> <span style={{ color: getPriorityColor(task.priority) }}>{getPriorityLabel(task.priority)}</span>
+                  </div>
+
+                  {task.assignee && (
+                    <div style={{ marginBottom: '4px', color: '#aaa' }}>
+                      <strong>👤</strong> {task.assignee}
+                    </div>
+                  )}
+
+                  {task.due_date && (
+                    <div style={{ marginBottom: '4px', color: '#aaa' }}>
+                      <strong>📅</strong> {new Date(task.due_date).toLocaleDateString('ru-RU')}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                    <button 
+                      onClick={async () => {
+                        // Restore task from archive
+                        const { error } = await supabase.from('tasks').update({ column_id: 'todo' }).eq('id', task.id);
+                        if (!error) {
+                          const { data, error: selectError } = await supabase.from('tasks').select('*');
+                          if (!selectError) {
+                            const activeTasks = { todo: [], inProgress: [], done: [] };
+                            const archivedTasksList = [];
+                            
+                            data.forEach(task => {
+                              if (task.column_id === 'archived') {
+                                archivedTasksList.push(task);
+                              } else {
+                                activeTasks[task.column_id].push(task);
+                              }
+                            });
+                            
+                            setColumns(activeTasks);
+                            setArchivedTasks(archivedTasksList);
+                          }
+                        }
+                      }}
+                      style={{ backgroundColor: '#3498db', color: 'white' }}
+                    >
+                      Восстановить
+                    </button>
+                    <button
+                      className="delete-btn"
+                      onClick={async () => {
+                        // Delete task permanently
+                        const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+                        if (!error) {
+                          const { data, error: selectError } = await supabase.from('tasks').select('*');
+                          if (!selectError) {
+                            const activeTasks = { todo: [], inProgress: [], done: [] };
+                            const archivedTasksList = [];
+                            
+                            data.forEach(task => {
+                              if (task.column_id === 'archived') {
+                                archivedTasksList.push(task);
+                              } else {
+                                activeTasks[task.column_id].push(task);
+                              }
+                            });
+                            
+                            setColumns(activeTasks);
+                            setArchivedTasks(archivedTasksList);
+                          }
+                        }
+                      }}
+                    >
+                      Удалить навсегда
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

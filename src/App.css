@@ -275,3 +275,64 @@ input[type="text"], input[type="date"] {
 .delete-btn:hover {
   background: #c62828;
 }
+
+/* Стили для переключения вида */
+.view-toggle {
+  padding: 5px 10px;
+  font-size: 14px;
+  background: var(--btn-bg);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-left: 5px;
+}
+
+.view-toggle.active {
+  background: #2ecc71;
+}
+
+.view-toggle:hover {
+  background: var(--btn-hover);
+}
+
+/* Стили для архива задач */
+.archive-view {
+  margin-top: 20px;
+}
+
+.archive-view h2 {
+  margin-top: 0;
+  color: var(--text-color);
+}
+
+.archived-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.archived-task-card {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--task-bg);
+  box-shadow: var(--task-shadow);
+  border-left: 4px solid #2ecc71;
+}
+
+/* Стили для кнопки архивации */
+.archive-btn {
+  background: #f39c12;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-left: 5px;
+}
+
+.archive-btn:hover {
+  background: #e67e22;
+}
