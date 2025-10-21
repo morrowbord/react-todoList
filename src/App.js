@@ -690,7 +690,7 @@ function App() {
     inProgress: { total: columns.inProgress.length, completed: columns.inProgress.filter(t => t.completed).length },
     done: { total: columns.done.length, completed: columns.done.filter(t => t.completed).length }
   };
-  const totalTasks = stats.todo.total + stats.inProgress.total + stats.done.total + archivedTasks.length;
+  const totalTasks = stats.todo.total + stats.inProgress.total + stats.done.total;
   const totalCompleted = stats.todo.completed + stats.inProgress.completed + stats.done.completed;
 
   if (loading) return <div>Загрузка...</div>;
