@@ -18,6 +18,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import notificationService from './services/notificationService';
+import { getUserTelegramId } from './utils/userUtils';
 
 // 🔐 Замените на ваш URL и анонимный ключ из проекта Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
@@ -251,6 +253,7 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [user, setUser] = useState(null); // { id, email, role: 'admin' | 'user' }
+  const [userTelegramId, setUserTelegramId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -278,7 +281,15 @@ function App() {
       if (session) {
         const email = session.user.email;
         const role = email === 'admin@example.com' ? 'admin' : 'user';
-        setUser({ id: session.user.id, email, role });
+        const userId = session.user.id;
+        
+        setUser({ id: userId, email, role });
+        
+        // Fetch user's Telegram ID
+        const telegramId = await getUserTelegramId(userId);
+        if (telegramId) {
+          setUserTelegramId(telegramId);
+        }
       }
     };
     fetchUser();
@@ -287,9 +298,19 @@ function App() {
       if (session) {
         const email = session.user.email;
         const role = email === 'admin@example.com' ? 'admin' : 'user';
-        setUser({ id: session.user.id, email, role });
+        const userId = session.user.id;
+        
+        setUser({ id: userId, email, role });
+        
+        // Fetch user's Telegram ID
+        getUserTelegramId(userId).then(telegramId => {
+          if (telegramId) {
+            setUserTelegramId(telegramId);
+          }
+        });
       } else {
         setUser(null);
+        setUserTelegramId(null);
       }
     });
 
@@ -408,6 +429,12 @@ function App() {
         
         setColumns(activeTasks);
         setArchivedTasks(archivedTasksList);
+        
+        // Send notification about new task
+        const newTask = data.find(t => t.text === text && t.created_by === user.id && t.column_id !== 'archived');
+        if (newTask) {
+          sendNotificationSafely(notificationService.notifyTaskCreated, newTask, user, []);
+        }
       }
     }
   };
@@ -430,6 +457,12 @@ function App() {
         
         setColumns(activeTasks);
         setArchivedTasks(archivedTasksList);
+        
+        // Send notification about task completion
+        const updatedTask = data.find(t => t.id === id);
+        if (updatedTask && updatedTask.completed) {
+          sendNotificationSafely(notificationService.notifyTaskCompleted, updatedTask, user, []);
+        }
       }
     }
   };
@@ -458,6 +491,12 @@ function App() {
       
       setColumns(activeTasks);
       setArchivedTasks(archivedTasksList);
+      
+      // Send notification about task archiving
+      const archivedTask = archivedTasksList.find(t => t.id === id);
+      if (archivedTask) {
+        sendNotificationSafely(notificationService.notifyTaskArchived, archivedTask, user, []);
+      }
     } else {
       console.error('Error fetching tasks after archiving:', selectError);
     }
@@ -494,6 +533,9 @@ function App() {
         
         setColumns(activeTasks);
         setArchivedTasks(archivedTasksList);
+        
+        // Send notification about task deletion
+        sendNotificationSafely(notificationService.notifyTaskDeleted, { id }, user, []);
       }
     }
   };
@@ -528,7 +570,29 @@ function App() {
         
         setColumns(activeTasks);
         setArchivedTasks(archivedTasksList);
+        
+        // Send notification about task editing
+        const updatedTask = data.find(t => t.id === id);
+        if (updatedTask) {
+          sendNotificationSafely(notificationService.notifyTaskEdited, updatedTask, user, []);
+        }
       }
+    }
+  };
+
+  // Helper function to send notifications safely without blocking task operations
+  const sendNotificationSafely = async (notificationFn, ...args) => {
+    try {
+      // Run notification in background without blocking
+      setTimeout(async () => {
+        // Bind the function to the notificationService instance to maintain 'this' context
+        if (typeof notificationFn === 'function') {
+          await notificationFn.apply(notificationService, args);
+        }
+      }, 0);
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      // Don't throw error as we don't want to break task operations
     }
   };
 
@@ -599,6 +663,11 @@ function App() {
           activeTasks[overColumnId] = [{ ...activeTask, column_id: overColumnId }, ...activeTasks[overColumnId].filter(t => t.id !== active.id)];
           setColumns(activeTasks);
           setArchivedTasks(archivedTasksList);
+          
+          // Send notification about task status change
+          console.log('Would send notification for task moved from', activeColumnId, 'to', overColumnId, 'task:', activeTask);
+          // You could implement specific notifications based on the transition
+          // e.g., if moving to 'done', send completion notification
         }
       }
     } else {
