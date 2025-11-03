@@ -47,7 +47,7 @@ const getPriorityColor = (priority) => {
 };
 
 // Компонент задачи
-function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateAssignee, onUpdateDate, onUpdatePriority }) {
+function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateAssignee, onUpdateDate, onUpdatePriority, startEditing = false, setEditingTaskId }) {
   const {
     attributes,
     listeners,
@@ -57,7 +57,11 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateA
     isDragging,
   } = useSortable({ id: task.id });
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(startEditing);
+  
+  useEffect(() => {
+    setIsEditing(startEditing);
+  }, [startEditing]);
   const [editText, setEditText] = useState(task.text);
   const [editAssignee, setEditAssignee] = useState(task.assignee || '');
   const [editDate, setEditDate] = useState(task.due_date || '');
@@ -68,6 +72,8 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateA
   const handleEdit = async () => {
     await onEdit(task.id, editText, task.column_id, editPriority, editAssignee, editDate);
     setIsEditing(false);
+    // Reset the editing task ID if this was the task being automatically edited
+    setEditingTaskId(null);
   };
 
   const formatDate = (dateStr) => {
@@ -124,7 +130,7 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateA
           }}
         >
           <option value="urgent">Срочно</option>
-          <option value="notImportant">Не важно</option>
+          <option value="notImportant">Проект</option>
           <option value="idea">Идея</option>
         </select>
         <input
@@ -159,7 +165,10 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateA
         <button onClick={handleEdit} style={{ marginRight: '8px' }}>
           Сохранить
         </button>
-        <button onClick={() => setIsEditing(false)}>Отмена</button>
+        <button onClick={() => {
+          setIsEditing(false);
+          setEditingTaskId(null);
+        }}>Отмена</button>
       </div>
     );
   }
@@ -232,7 +241,10 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateA
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-        <button onClick={() => setIsEditing(true)} disabled={!canEdit}>
+        <button onClick={() => {
+          setIsEditing(true);
+          setEditingTaskId(task.id);
+        }} disabled={!canEdit}>
           {canEdit ? 'Редактировать' : 'Нет прав'}
         </button>
         <button
@@ -252,6 +264,7 @@ function App() {
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
+  const [editingTaskId, setEditingTaskId] = useState(null); // Track which task is being edited
   const [user, setUser] = useState(null); // { id, email, role: 'admin' | 'user' }
   const [userTelegramId, setUserTelegramId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -408,34 +421,24 @@ function App() {
       taskData.due_date = dueDate;
     }
 
-    const { error } = await supabase.from('tasks').insert(taskData);
+    const { data: insertedTask, error } = await supabase.from('tasks').insert(taskData).select().single();
 
     if (error) {
       console.error('Ошибка при добавлении задачи:', error);
       alert('Ошибка: ' + error.message);
     } else {
-      const { data, error } = await supabase.from('tasks').select('*');
-      if (!error) {
-        const activeTasks = { todo: [], inProgress: [], done: [] };
-        const archivedTasksList = [];
-        
-        data.forEach(task => {
-          if (task.column_id === 'archived') {
-            archivedTasksList.push(task);
-          } else {
-            activeTasks[task.column_id].push(task);
-          }
-        });
-        
-        setColumns(activeTasks);
-        setArchivedTasks(archivedTasksList);
-        
-        // Send notification about new task
-        const newTask = data.find(t => t.text === text && t.created_by === user.id && t.column_id !== 'archived');
-        if (newTask) {
-          sendNotificationSafely(notificationService.notifyTaskCreated, newTask, user, []);
-        }
-      }
+      // Add the new task to the beginning of the appropriate column
+      setColumns(prevColumns => {
+        const newColumns = { ...prevColumns };
+        newColumns[columnId] = [insertedTask, ...newColumns[columnId]];
+        return newColumns;
+      });
+      
+      // Set the new task as the one to be edited automatically
+      setEditingTaskId(insertedTask.id);
+      
+      // Send notification about new task
+      // sendNotificationSafely(notificationService.notifyTaskCreated, insertedTask, user, []);
     }
   };
 
@@ -803,6 +806,8 @@ function App() {
                           onUpdateAssignee={() => {}}
                           onUpdateDate={() => {}}
                           onUpdatePriority={() => {}}
+                          startEditing={editingTaskId === task.id}
+                          setEditingTaskId={setEditingTaskId}
                         />
                       ))}
                     </div>
