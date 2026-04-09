@@ -123,9 +123,27 @@ class NotificationService {
   // Determine which users should receive notifications for a task
   getRelevantUsersForTask = (task, action, allUsers) => {
     // This would typically check a user profile table for Telegram chat IDs
-    // For now, returning empty array as placeholder
+    // For now, we'll return the chat ID of the task creator and any admins
     // In a real implementation, this would query your user profiles table
-    return [];
+    const relevantUsers = [];
+    
+    // Add the task creator's chat ID if available
+    if (task.created_by_email) {
+      const taskCreator = allUsers.find(user => user.email === task.created_by_email);
+      if (taskCreator && taskCreator.telegram_id) {
+        relevantUsers.push(taskCreator.telegram_id);
+      }
+    }
+    
+    // Add any admin users' chat IDs
+    const adminUsers = allUsers.filter(user => user.role === 'admin' && user.telegram_id);
+    adminUsers.forEach(admin => {
+      if (!relevantUsers.includes(admin.telegram_id)) {
+        relevantUsers.push(admin.telegram_id);
+      }
+    });
+    
+    return relevantUsers;
   }
 
   // Specific notification methods for different actions

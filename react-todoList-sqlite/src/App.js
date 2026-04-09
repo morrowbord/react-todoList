@@ -197,10 +197,14 @@ function TaskCard({ task, user, onToggle, onDelete, onEdit, onArchive, onUpdateA
         {...listeners}
       >
         <span>≡</span>
-        <span style={{
-          textDecoration: task.completed ? 'line-through' : 'none',
-          color: task.completed ? '#999' : 'var(--text-color)'
-        }}>
+        <span
+          data-completed={task.completed}
+          style={{
+            textDecoration: task.completed ? 'line-through' : 'none',
+            color: task.completed ? '#999' : 'var(--text-color)',
+            transition: 'all 0.2s ease'
+          }}
+        >
           {task.text}
         </span>
       </div>
@@ -587,6 +591,25 @@ function App() {
 
   const toggleTask = async (id) => {
     try {
+      // Optimistically update the UI
+      setColumns(prevColumns => {
+        const newColumns = { ...prevColumns };
+        for (const colId in newColumns) {
+          const taskIndex = newColumns[colId].findIndex(t => t.id === id);
+          if (taskIndex !== -1) {
+            // Create a copy of the task with toggled completed status
+            newColumns[colId] = [...newColumns[colId]];
+            newColumns[colId][taskIndex] = {
+              ...newColumns[colId][taskIndex],
+              completed: !newColumns[colId][taskIndex].completed
+            };
+            break;
+          }
+        }
+        return newColumns;
+      });
+
+      // Then make the API call
       const response = await fetch(`${API_BASE_URL}/tasks/${id}/toggle`, {
         method: 'PUT',
         headers: {
@@ -597,12 +620,13 @@ function App() {
       if (response.ok) {
         const updatedTask = await response.json();
 
-        // Update the task in the state
+        // Update with the server response to ensure consistency
         setColumns(prevColumns => {
           const newColumns = { ...prevColumns };
           for (const colId in newColumns) {
             const taskIndex = newColumns[colId].findIndex(t => t.id === id);
             if (taskIndex !== -1) {
+              newColumns[colId] = [...newColumns[colId]];
               newColumns[colId][taskIndex] = updatedTask;
               break;
             }
@@ -612,12 +636,30 @@ function App() {
 
         // Send notification about task completion
         if (updatedTask.completed) {
-          sendNotificationSafely(notificationService.notifyTaskCompleted, updatedTask, user, []);
+          sendNotificationSafely(notificationService.notifyTaskCompleted, updatedTask, user, [user]);
         }
       } else {
+        // Revert the optimistic update if API call fails
         console.error('Error toggling task:', response.statusText);
         const errorText = await response.text();
         console.error('Error details:', errorText);
+        
+        // Reload tasks from server to revert the change
+        const fetchResponse = await fetch(`${API_BASE_URL}/tasks`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (fetchResponse.ok) {
+          const data = await fetchResponse.json();
+          const activeTasks = { todo: [], inProgress: [], done: [] };
+          data.forEach(task => {
+            if (task.column_id !== 'archived') {
+              activeTasks[task.column_id].push(task);
+            }
+          });
+          setColumns(activeTasks);
+        }
       }
     } catch (error) {
       console.error('Error toggling task:', error);
@@ -648,7 +690,7 @@ function App() {
         setArchivedTasks(prev => [...prev, archivedTask]);
 
         // Send notification about task archiving
-        sendNotificationSafely(notificationService.notifyTaskArchived, archivedTask, user, []);
+        sendNotificationSafely(notificationService.notifyTaskArchived, archivedTask, user, [user]);
       } else {
         console.error('Error archiving task:', response.statusText);
         const errorText = await response.text();
@@ -683,7 +725,7 @@ function App() {
         setArchivedTasks(prev => prev.filter(t => t.id !== id));
 
         // Send notification about task deletion
-        sendNotificationSafely(notificationService.notifyTaskDeleted, { id }, user, []);
+        sendNotificationSafely(notificationService.notifyTaskDeleted, { id }, user, [user]);
       } else {
         console.error('Error deleting task:', response.statusText);
         const errorText = await response.text();
@@ -696,8 +738,19 @@ function App() {
 
   const editTask = async (id, newText, columnId, priority, assignee, dueDate) => {
     try {
+      // Find the current task to preserve the 'completed' status
+      let currentCompletedStatus = false;
+      for (const colId in columns) {
+        const task = columns[colId].find(t => t.id === id);
+        if (task) {
+          currentCompletedStatus = task.completed;
+          break;
+        }
+      }
+
       const taskData = {
         text: newText,
+        completed: currentCompletedStatus, // Preserve the current completed status
         priority,
         assignee,
         due_date: dueDate || null,
@@ -716,12 +769,13 @@ function App() {
       if (response.ok) {
         const updatedTask = await response.json();
 
-        // Update the task in the state
+        // Update the task in the state with proper immutability
         setColumns(prevColumns => {
           const newColumns = { ...prevColumns };
           for (const colId in newColumns) {
             const taskIndex = newColumns[colId].findIndex(t => t.id === id);
             if (taskIndex !== -1) {
+              newColumns[colId] = [...newColumns[colId]];
               newColumns[colId][taskIndex] = updatedTask;
               break;
             }
@@ -730,7 +784,7 @@ function App() {
         });
 
         // Send notification about task editing
-        sendNotificationSafely(notificationService.notifyTaskEdited, updatedTask, user, []);
+        sendNotificationSafely(notificationService.notifyTaskEdited, updatedTask, user, [user]);
       } else {
         console.error('Error editing task:', response.statusText);
         const errorText = await response.text();
@@ -795,22 +849,16 @@ function App() {
 
     if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
 
-    const activeTask = columns[activeColumnId].find(t => t.id === active.id);
-    if (!activeTask) return;
+    const activeTaskObj = columns[activeColumnId].find(t => t.id === active.id);
+    if (!activeTaskObj) return;
 
-    if (user.role !== 'admin' && activeTask.created_by !== user.id) {
+    if (user.role !== 'admin' && activeTaskObj.created_by !== user.id) {
       alert('Нет прав для перемещения чужой задачи');
       return;
     }
 
     // Если перетаскивание между колонками
     if (activeColumnId !== overColumnId) {
-      // Check permissions before attempting to move
-      if (user.role !== 'admin' && activeTask.created_by !== user.id) {
-        alert('Нет прав для перемещения чужой задачи');
-        return;
-      }
-
       try {
         const response = await fetch(`${API_BASE_URL}/tasks/${active.id}`, {
           method: 'PUT',
@@ -819,20 +867,20 @@ function App() {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify({
-            text: activeTask.text,
-            completed: activeTask.completed,
-            priority: activeTask.priority,
-            assignee: activeTask.assignee,
-            due_date: activeTask.due_date,
-            column_id: overColumnId,  // Only changing the column
-            created_by: activeTask.created_by
+            text: activeTaskObj.text,
+            completed: activeTaskObj.completed,
+            priority: activeTaskObj.priority,
+            assignee: activeTaskObj.assignee,
+            due_date: activeTaskObj.due_date,
+            column_id: overColumnId,
+            created_by: activeTaskObj.created_by
           }),
         });
 
         if (response.ok) {
           const updatedTask = await response.json();
 
-          // Update the state
+          // Update the state - ensure proper immutability
           setColumns(prev => {
             const newColumns = { ...prev };
 
@@ -844,20 +892,71 @@ function App() {
 
             return newColumns;
           });
+          
+          // Force reload from server to ensure data consistency
+          const fetchResponse = await fetch(`${API_BASE_URL}/tasks`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          if (fetchResponse.ok) {
+            const data = await fetchResponse.json();
+            const activeTasks = { todo: [], inProgress: [], done: [] };
+            data.forEach(task => {
+              if (task.column_id !== 'archived') {
+                activeTasks[task.column_id].push(task);
+              }
+            });
+            setColumns(activeTasks);
+          }
         } else {
           console.error('Error updating task position:', response.statusText);
           const errorText = await response.text();
           console.error('Error details:', errorText);
+          
+          // Reload tasks from server on error
+          const fetchResponse = await fetch(`${API_BASE_URL}/tasks`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          if (fetchResponse.ok) {
+            const data = await fetchResponse.json();
+            const activeTasks = { todo: [], inProgress: [], done: [] };
+            data.forEach(task => {
+              if (task.column_id !== 'archived') {
+                activeTasks[task.column_id].push(task);
+              }
+            });
+            setColumns(activeTasks);
+          }
         }
       } catch (error) {
         console.error('Error updating task position:', error);
+        
+        // Reload tasks from server on error
+        const fetchResponse = await fetch(`${API_BASE_URL}/tasks`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (fetchResponse.ok) {
+          const data = await fetchResponse.json();
+          const activeTasks = { todo: [], inProgress: [], done: [] };
+          data.forEach(task => {
+            if (task.column_id !== 'archived') {
+              activeTasks[task.column_id].push(task);
+            }
+          });
+          setColumns(activeTasks);
+        }
       }
     } else {
       // Перетаскивание внутри одной колонки
       const tasks = columns[activeColumnId];
       const oldIndex = tasks.findIndex(t => t.id === active.id);
       const newIndex = tasks.findIndex(t => t.id === over.id);
-      if (oldIndex !== newIndex) {
+      if (oldIndex !== newIndex && oldIndex !== -1 && newIndex !== -1) {
         const newTasks = arrayMove(tasks, oldIndex, newIndex);
         setColumns(prev => ({
           ...prev,
