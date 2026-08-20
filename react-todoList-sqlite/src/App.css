@@ -9,8 +9,6 @@
   --column-bg-todo: #e6e6fa;
   --column-bg-inprogress: #f5f5dc;
   --column-bg-done: #f0fff0;
-
-  /* Стили для задач */
   --task-bg: white;
   --task-border: #ddd;
   --task-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -27,8 +25,6 @@
   --column-bg-todo: #2c2c54;
   --column-bg-inprogress: #2c3e2c;
   --column-bg-done: #2c542c;
-
-  /* Стили для задач */
   --task-bg: #2a2a2a;
   --task-border: #444;
   --task-shadow: 0 1px 3px rgba(0,0,0,0.5);
@@ -43,6 +39,17 @@ body {
   padding: 20px;
 }
 
+/* ── Loading ── */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 18px;
+  color: var(--text-color);
+}
+
+/* ── Container ── */
 .container {
   max-width: 100%;
   margin: auto;
@@ -53,6 +60,7 @@ body {
   transition: background-color 0.3s;
 }
 
+/* ── Header ── */
 .header {
   display: flex;
   justify-content: space-between;
@@ -60,12 +68,23 @@ body {
   margin-bottom: 20px;
 }
 
-h1 {
+.header h1 {
   margin: 0;
   color: var(--text-color);
 }
 
-.theme-toggle {
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-right span {
+  font-size: 14px;
+}
+
+.theme-toggle,
+.logout-btn {
   padding: 5px 10px;
   font-size: 14px;
   background: var(--btn-bg);
@@ -75,6 +94,11 @@ h1 {
   border-radius: 4px;
 }
 
+.logout-btn {
+  background: var(--delete-btn-bg);
+}
+
+/* ── Stats ── */
 .stats {
   display: flex;
   gap: 20px;
@@ -102,6 +126,7 @@ h1 {
   font-weight: bold;
 }
 
+/* ── Kanban Board ── */
 .kanban-board {
   display: flex;
   gap: 20px;
@@ -109,6 +134,7 @@ h1 {
   padding: 10px 0;
 }
 
+/* ── Column ── */
 .column {
   min-width: 300px;
   background: var(--column-bg-todo);
@@ -148,7 +174,7 @@ h1 {
   font-weight: normal;
 }
 
-.column-header button {
+.add-task-btn {
   padding: 5px 10px;
   font-size: 14px;
   background: transparent;
@@ -158,13 +184,108 @@ h1 {
   text-decoration: underline;
 }
 
+.add-task-btn:hover {
+  background: transparent;
+}
+
 .task-list {
   flex: 1;
   overflow-y: auto;
   min-height: 200px;
 }
 
-/* Стили для кнопок */
+/* ── Task Card ── */
+.task-card {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--task-bg);
+  box-shadow: var(--task-shadow);
+  transition: transform 0.2s;
+}
+
+.task-card-header {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.drag-handle {
+  font-weight: bold;
+  color: #666;
+  font-size: 16px;
+}
+
+.task-text {
+  transition: all 0.2s ease;
+}
+
+.task-text.completed {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.task-card-checkbox {
+  margin-bottom: 8px;
+}
+
+.task-card-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.task-card-checkbox input[type="checkbox"] {
+  margin: 0;
+}
+
+.task-card-priority {
+  margin-bottom: 6px;
+}
+
+.task-card-meta {
+  margin-bottom: 4px;
+  color: #aaa;
+}
+
+.task-card-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.overdue-badge {
+  color: #e74c3c;
+  margin-left: 4px;
+  font-weight: bold;
+}
+
+/* ── Task Card Editing ── */
+.task-card-editing {
+  padding: 12px;
+}
+
+.task-edit-input {
+  width: 100%;
+  padding: 6px;
+  margin-bottom: 8px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.task-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Buttons ── */
 button {
   padding: 8px 12px;
   font-size: 14px;
@@ -180,103 +301,38 @@ button:hover {
   background: var(--btn-hover);
 }
 
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background: #999;
+}
+
+.cancel-btn:hover {
+  background: #777;
+}
+
 .delete-btn {
   background: var(--delete-btn-bg);
   margin-left: 5px;
-}
-
-input[type="text"], input[type="date"] {
-  padding: 6px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 14px;
-  background: var(--container-bg);
-  color: var(--text-color);
-}
-
-/* Стили для задач */
-.task-card {
-  padding: 12px;
-  margin-bottom: 8px;
-  border-radius: 6px;
-  background: var(--task-bg);
-  box-shadow: var(--task-shadow);
-  border-left: 4px solid #2ecc71;
-  transition: transform 0.2s;
-}
-
-.task-card.dragging {
-  opacity: 0.5;
-  transform: scale(0.98);
-}
-
-.task-card.completed span {
-  text-decoration: line-through;
-  color: #999;
-}
-
-/* Статусы */
-.status-urgent {
-  color: #e74c3c;
-}
-
-.status-notImportant {
-  color: #95a5a6;
-}
-
-.status-idea {
-  color: #3498db;
-}
-
-/* Просроченная дата */
-.due-date-overdue {
-  color: #e74c3c;
-  font-weight: bold;
-}
-
-/* Иконки */
-.icon-handle {
-  cursor: grab;
-  font-weight: bold;
-  color: #666;
-}
-
-.icon-user {
-  color: #666;
-}
-
-.icon-calendar {
-  color: #666;
-}
-
-/* Кнопки редактирования и удаления */
-.edit-btn {
-  background: var(--btn-bg);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.delete-btn {
-  background: var(--delete-btn-bg);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.edit-btn:hover {
-  background: var(--btn-hover);
 }
 
 .delete-btn:hover {
   background: #c62828;
 }
 
-/* Стили для переключения вида */
+.archive-btn {
+  background: #f39c12;
+  color: white;
+}
+
+.archive-btn:hover {
+  background: #e67e22;
+}
+
+/* ── View Toggle ── */
 .view-toggle {
   padding: 5px 10px;
   font-size: 14px;
@@ -285,7 +341,6 @@ input[type="text"], input[type="date"] {
   border: none;
   cursor: pointer;
   border-radius: 4px;
-  margin-left: 5px;
 }
 
 .view-toggle.active {
@@ -296,7 +351,35 @@ input[type="text"], input[type="date"] {
   background: var(--btn-hover);
 }
 
-/* Стили для архива задач */
+/* ── Login Form ── */
+.login-section {
+  margin-top: 20px;
+}
+
+.login-input {
+  display: block;
+  margin-bottom: 10px;
+  padding: 8px;
+  width: 100%;
+  max-width: 300px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.error-message {
+  background: #ffe0e0;
+  color: #d32f2f;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+/* ── Archive ── */
 .archive-view {
   margin-top: 20px;
 }
@@ -318,21 +401,130 @@ input[type="text"], input[type="date"] {
   border-radius: 6px;
   background: var(--task-bg);
   box-shadow: var(--task-shadow);
-  border-left: 4px solid #2ecc71;
 }
 
-/* Стили для кнопки архивации */
-.archive-btn {
-  background: #f39c12;
+.archived-task-header {
+  margin-bottom: 8px;
+}
+
+.completed-badge {
+  margin-left: 8px;
+  color: #27ae60;
+}
+
+.archived-task-priority {
+  margin-bottom: 4px;
+}
+
+.archived-task-meta {
+  margin-bottom: 4px;
+  color: #aaa;
+}
+
+.archived-task-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.restore-btn {
+  background: #3498db;
   color: white;
-  border: none;
-  padding: 8px 12px;
+}
+
+.restore-btn:hover {
+  background: #2980b9;
+}
+
+.confirm-delete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm-delete span {
   font-size: 14px;
+  color: var(--text-color);
+}
+
+.empty-state {
+  color: #999;
+  font-style: italic;
+}
+
+/* ── Drag Overlay ── */
+.drag-overlay {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* ── Filter Bar ── */
+.filter-bar {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--container-bg);
+  border-radius: 8px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.08);
+}
+
+.filter-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-search-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  min-width: 220px;
+}
+
+.filter-search-input::placeholder {
+  color: #999;
+}
+
+.filter-select {
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--container-bg);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.filter-clear-btn {
+  padding: 7px 12px;
+  font-size: 13px;
+  background: transparent;
+  color: var(--delete-btn-bg);
+  border: 1px solid var(--delete-btn-bg);
   cursor: pointer;
   border-radius: 4px;
-  margin-left: 5px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
-.archive-btn:hover {
-  background: #e67e22;
+.filter-clear-btn:hover {
+  background: var(--delete-btn-bg);
+  color: white;
 }
