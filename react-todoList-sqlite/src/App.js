@@ -8,6 +8,9 @@ import ArchiveView from './components/ArchiveView';
 import FilterBar from './components/FilterBar';
 import './App.css';
 
+// Columns that are included in statistics ('planning' tasks are excluded)
+const STAT_COLUMNS = ['todo', 'inProgress', 'done'];
+
 const AppContent = () => {
   const { user, loading: authLoading } = useAuth();
   const { columns, archivedTasks, filteredColumns, hasActiveFilters } = useTasks();
@@ -30,16 +33,15 @@ const AppContent = () => {
   if (!user) return <LoginForm />;
 
   // Calculate stats from filtered columns (reflects current search/filter)
+  // NOTE: 'planning' column tasks are not counted in statistics
   const displayColumns = filteredColumns;
-  const totalFiltered = displayColumns.todo.length + displayColumns.inProgress.length + displayColumns.done.length;
-  const completedFiltered = displayColumns.todo.filter(t => t.completed).length
-    + displayColumns.inProgress.filter(t => t.completed).length
-    + displayColumns.done.filter(t => t.completed).length;
+  const totalFiltered = STAT_COLUMNS.reduce((n, id) => n + displayColumns[id].length, 0);
+  const completedFiltered = STAT_COLUMNS.reduce(
+    (n, id) => n + displayColumns[id].filter(t => t.completed).length, 0);
   // Total counts (always from raw columns)
-  const totalAll = columns.todo.length + columns.inProgress.length + columns.done.length;
-  const completedAll = columns.todo.filter(t => t.completed).length
-    + columns.inProgress.filter(t => t.completed).length
-    + columns.done.filter(t => t.completed).length;
+  const totalAll = STAT_COLUMNS.reduce((n, id) => n + columns[id].length, 0);
+  const completedAll = STAT_COLUMNS.reduce(
+    (n, id) => n + columns[id].filter(t => t.completed).length, 0);
 
   return (
     <div className={`container ${darkMode ? 'dark' : ''}`}>

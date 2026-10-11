@@ -65,7 +65,7 @@ const KanbanBoard = ({ editingTaskId, setEditingTaskId }) => {
 
     // Find target column
     const overColumnId = over.data?.current?.sortable?.containerId || over.id;
-    if (!['todo', 'inProgress', 'done'].includes(overColumnId)) return;
+    if (!['planning', 'todo', 'inProgress', 'done'].includes(overColumnId)) return;
 
     // Check permissions
     const activeTaskObj = columns[activeColumnId].find(t => t.id === active.id);

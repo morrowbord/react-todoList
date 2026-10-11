@@ -3,6 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import TaskCard from './TaskCard';
 
 const COLUMN_NAMES = {
+  planning: 'Планирование',
   todo: 'Задачи',
   inProgress: 'В работе',
   done: 'Готово',

@@ -30,7 +30,7 @@ const PRIORITY_ORDER = { urgent: 0, notImportant: 1, idea: 2 };
 
 export const TasksProvider = ({ children }) => {
   const { user } = useAuth();
-  const [columns, setColumns] = useState({ todo: [], inProgress: [], done: [] });
+  const [columns, setColumns] = useState({ planning: [], todo: [], inProgress: [], done: [] });
   const [archivedTasks, setArchivedTasks] = useState([]);
 
   // ── Filters & Sort ──
@@ -42,7 +42,7 @@ export const TasksProvider = ({ children }) => {
   // Fetch all tasks when user is authenticated
   const fetchTasks = useCallback(async () => {
     if (!user) {
-      setColumns({ todo: [], inProgress: [], done: [] });
+      setColumns({ planning: [], todo: [], inProgress: [], done: [] });
       setArchivedTasks([]);
       return;
     }
@@ -53,7 +53,7 @@ export const TasksProvider = ({ children }) => {
         tasksApi.getArchivedTasks(),
       ]);
 
-      const activeTasks = { todo: [], inProgress: [], done: [] };
+      const activeTasks = { planning: [], todo: [], inProgress: [], done: [] };
       activeData.forEach(task => {
         if (task.column_id in activeTasks) {
           activeTasks[task.column_id].push(task);
@@ -63,7 +63,7 @@ export const TasksProvider = ({ children }) => {
       setArchivedTasks(archivedData);
     } catch (error) {
       console.error('Error fetching tasks:', error);
-      setColumns({ todo: [], inProgress: [], done: [] });
+      setColumns({ planning: [], todo: [], inProgress: [], done: [] });
       setArchivedTasks([]);
     }
   }, [user]);
@@ -290,6 +290,7 @@ export const TasksProvider = ({ children }) => {
     };
 
     return {
+      planning: sortTasks(columns.planning.filter(matchesFilters)),
       todo: sortTasks(columns.todo.filter(matchesFilters)),
       inProgress: sortTasks(columns.inProgress.filter(matchesFilters)),
       done: sortTasks(columns.done.filter(matchesFilters)),
